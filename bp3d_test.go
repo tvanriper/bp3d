@@ -2,6 +2,7 @@ package bp3d
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -17,6 +18,212 @@ type testData struct {
 	items       []*Item
 	errExpected bool
 	expectation result
+}
+
+func TestEfficiency(t *testing.T) {
+	bins := []*Bin{
+		NewBin("Bin-1", 2, 1, 2, 100),
+		NewBin("Bin-2", 2, 1, 2, 100),
+		NewBin("Bin-3", 5, 2, 5, 100),
+	}
+	items := []*Item{
+		NewItem("Item-1", 2, 1, 1, 1),
+		NewItem("Item-2", 2, 1, 1, 1),
+		NewItem("Item-3", 2, 1, 1, 1),
+		NewItem("Item-4", 2, 1, 1, 1),
+	}
+
+	p := NewPacker()
+	for _, bin := range bins {
+		p.AddBin(bin)
+	}
+	for _, item := range items {
+		p.AddItem(item)
+	}
+	err := p.Pack()
+	if err != nil {
+		t.Error(err)
+	} else {
+		if len(p.Bins) != 3 {
+			t.Fatalf("unexpected bin count")
+		}
+		if len(p.Bins[0].Items) != 2 {
+			t.Errorf("expected 2 items in first bin")
+		}
+		if len(p.Bins[1].Items) != 2 {
+			t.Errorf("expected 2 items in second bin")
+		}
+	}
+}
+
+func TestFewest1(t *testing.T) {
+	bins := []*Bin{
+		NewBin("Bin-1", 2, 1, 2, 100),
+		NewBin("Bin-2", 2, 1, 2, 100),
+		NewBin("Bin-3", 5, 2, 5, 100),
+	}
+	items := []*Item{
+		NewItem("Item-1", 2, 1, 1, 1),
+		NewItem("Item-2", 2, 1, 1, 1),
+		NewItem("Item-3", 2, 1, 1, 1),
+		NewItem("Item-4", 2, 1, 1, 1),
+	}
+
+	p := NewPacker()
+	p.FewestBoxes = true
+	for _, bin := range bins {
+		p.AddBin(bin)
+	}
+	for _, item := range items {
+		p.AddItem(item)
+	}
+	err := p.Pack()
+	if err != nil {
+		t.Error(err)
+	} else {
+		if len(p.Bins) != 3 {
+			t.Fatalf("expected 3 bins")
+		}
+		if len(p.Bins[2].Items) != 4 {
+			t.Errorf("expected all items in bin 3")
+		}
+	}
+}
+
+func TestFewest2(t *testing.T) {
+	bins := []*Bin{
+		NewBin("Bin-1", 2, 1, 2, 100),
+		NewBin("Bin-2", 2, 1, 2, 100),
+		NewBin("Bin-3", 4, 2, 2, 100),
+	}
+	items := []*Item{
+		NewItem("Item-1", 2, 1, 1, 1),
+		NewItem("Item-2", 2, 1, 1, 1),
+		NewItem("Item-3", 2, 1, 1, 1),
+		NewItem("Item-4", 2, 1, 1, 1),
+		NewItem("Item-5", 2, 1, 1, 1),
+		NewItem("Item-6", 2, 1, 1, 1),
+		NewItem("Item-7", 2, 1, 1, 1),
+		NewItem("Item-8", 2, 1, 1, 1),
+		NewItem("Item-9", 2, 1, 1, 1),
+	}
+
+	p := NewPacker()
+	p.FewestBoxes = true
+	for _, bin := range bins {
+		p.AddBin(bin)
+	}
+	for _, item := range items {
+		p.AddItem(item)
+	}
+	err := p.Pack()
+	if err != nil {
+		t.Error(err)
+	} else {
+		if len(p.Bins) != 3 {
+			t.Fatalf("expected 3 bins")
+		}
+		if len(p.Bins[2].Items) != 8 {
+			t.Errorf("expected 8 items in bin 3: %d", len(p.Bins[2].Items))
+		}
+		if len(p.Bins[0].Items) != 1 {
+			t.Errorf("expected 1 item in bin 1: %d", len(p.Bins[0].Items))
+		}
+	}
+}
+
+func TestFewest3(t *testing.T) {
+	bins := []*Bin{
+		NewBin("Bin-1", 2, 1, 1, 100),
+		NewBin("Bin-2", 3, 1, 1, 100),
+		NewBin("Bin-3", 4, 1, 1, 100),
+	}
+	items := []*Item{
+		NewItem("Item-1", 2, 1, 1, 1),
+		NewItem("Item-2", 3, 1, 1, 1),
+		NewItem("Item-3", 4, 1, 1, 1),
+	}
+
+	p := NewPacker()
+	p.FewestBoxes = true
+	for _, bin := range bins {
+		p.AddBin(bin)
+	}
+	for _, item := range items {
+		p.AddItem(item)
+	}
+	err := p.Pack()
+	if err != nil {
+		t.Error(err)
+	} else {
+		if len(p.Bins) != 3 {
+			t.Fatalf("expected 3 bins")
+		}
+		if len(p.Bins[2].Items) != 1 {
+			t.Errorf("expected 1 items in bin 3: %d", len(p.Bins[2].Items))
+		}
+		if len(p.Bins[1].Items) != 1 {
+			t.Errorf("expected 1 items in bin 2: %d", len(p.Bins[1].Items))
+		}
+		if len(p.Bins[0].Items) != 1 {
+			t.Errorf("expected 1 item in bin 1: %d", len(p.Bins[0].Items))
+		}
+	}
+}
+
+func TestFewest4(t *testing.T) {
+	if os.Getenv("DEEP_TESTING") == "" {
+		t.Skip("Skipping TestFewest4 (not DEEP_TESTING).")
+		return
+	}
+	bins := []*Bin{
+		NewBin("Bin-1", 2, 1, 1, 100),
+		NewBin("Bin-2", 3, 1, 1, 100),
+		NewBin("Bin-3", 4, 1, 1, 100),
+	}
+	items := []*Item{
+		NewItem("Item-1", 2, 1, 1, 1),
+		NewItem("Item-2", 2, 1, 1, 1),
+		NewItem("Item-3", 3, 1, 1, 1),
+	}
+
+	p := NewPacker()
+	p.FewestBoxes = true
+	for _, bin := range bins {
+		p.AddBin(bin)
+	}
+	for _, item := range items {
+		p.AddItem(item)
+	}
+	err := p.Pack()
+	if err != nil {
+		t.Error(err)
+	} else {
+		hasError := false
+		if len(p.Bins) != 3 {
+			t.Fatalf("expected 3 bins")
+		}
+		if len(p.Bins[2].Items) != 2 {
+			t.Errorf("expected 2 items in bin 3: %d", len(p.Bins[2].Items))
+			hasError = true
+		}
+		if len(p.Bins[1].Items) != 1 {
+			t.Errorf("expected 1 items in bin 2: %d", len(p.Bins[1].Items))
+			hasError = true
+		}
+		if len(p.Bins[0].Items) != 0 {
+			t.Errorf("expected 0 item in bin 1: %d", len(p.Bins[0].Items))
+			hasError = true
+		}
+		if hasError {
+			for _, bin := range p.Bins {
+				t.Logf("%s:", bin.Name)
+				for _, item := range bin.Items {
+					t.Logf("* %s", item.Name)
+				}
+			}
+		}
+	}
 }
 
 func TestPack(t *testing.T) {
@@ -224,6 +431,18 @@ func TestPack(t *testing.T) {
 				NewItem("CR-AL0105-3", 22.0, 28.0, 2.5, 0.5),
 				NewItem("CR-AL0105-4", 22.0, 28.0, 2.5, 0.5),
 				NewItem("CR-AL0105-5", 22.0, 28.0, 2.5, 0.5),
+			},
+		},
+		{
+			name: "check same fits",
+			bins: []*Bin{
+				NewBin("Bin-1", 2.0, 1.0, 2.0, 15.0),
+				NewBin("Bin-2", 2.0, 1.0, 2.0, 20.0),
+				NewBin("Bin-3", 3.0, 2.0, 3.0, 20.0),
+			},
+			items: []*Item{
+				NewItem("Item-1", 2.0, 1.0, 2.0, 0.1),
+				NewItem("Item-2", 2.0, 1.0, 2.0, 0.1),
 			},
 		},
 	}

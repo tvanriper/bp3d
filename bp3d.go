@@ -28,6 +28,16 @@ func (bs BinSlice) Swap(i, j int) {
 	bs[i], bs[j] = bs[j], bs[i]
 }
 
+type RevBinSlice []*Bin
+
+func (bs RevBinSlice) Len() int { return len(bs) }
+func (bs RevBinSlice) Less(i, j int) bool {
+	return bs[j].GetVolume() < bs[i].GetVolume()
+}
+func (bs RevBinSlice) Swap(i, j int) {
+	bs[i], bs[j] = bs[j], bs[i]
+}
+
 // NewBin constructs new Bin with width w, height h, depth d, and max weight mw.
 func NewBin(name string, w, h, d, mw float64) *Bin {
 	return &Bin{
@@ -63,6 +73,25 @@ func (b *Bin) GetDepth() float64 {
 // GetDepth returns bin's volume.
 func (b *Bin) GetVolume() float64 {
 	return b.Width * b.Height * b.Depth
+}
+
+// GetUsedVolume returns the volume consumed by items in the bin.
+func (b *Bin) GetUsedVolume() (result float64) {
+	result = 0.0
+	for _, item := range b.Items {
+		result += item.GetVolume()
+	}
+	return
+}
+
+// GetAvailableVolume returns bin's available volume (after items added).
+func (b *Bin) GetAvailableVolume() (result float64) {
+	return b.GetVolume() - b.GetUsedVolume()
+}
+
+// GetVolumeUtilization returns the percentage of the space consumed.
+func (b *Bin) GetVolumeUtilization() (result float64) {
+	return (b.GetUsedVolume() * 100.0) / b.GetVolume()
 }
 
 // GetDepth returns bin's max weight.
@@ -249,16 +278,18 @@ func (i *Item) String() string {
 }
 
 type Packer struct {
-	Bins       []*Bin
-	Items      []*Item
-	UnfitItems []*Item // items that don't fit to any bin
+	FewestBoxes bool
+	Bins        []*Bin
+	Items       []*Item
+	UnfitItems  []*Item // items that don't fit to any bin
 }
 
 func NewPacker() *Packer {
 	return &Packer{
-		Bins:       make([]*Bin, 0),
-		Items:      make([]*Item, 0),
-		UnfitItems: make([]*Item, 0),
+		FewestBoxes: false,
+		Bins:        make([]*Bin, 0),
+		Items:       make([]*Item, 0),
+		UnfitItems:  make([]*Item, 0),
 	}
 }
 
@@ -271,8 +302,8 @@ func (p *Packer) AddItem(items ...*Item) {
 }
 
 var (
-	InvalidBinsVolume = errors.New("invalid bins volume")
-	UnfitItemsExist   = errors.New("unfit items existing")
+	ErrInvalidBinsVolume = errors.New("invalid bins volume")
+	ErrUnfitItemsExist   = errors.New("unfit items existing")
 )
 
 func (p *Packer) Pack() error {
@@ -282,7 +313,7 @@ func (p *Packer) Pack() error {
 	maxVolumeItem := p.Items[0]
 	maxVolumeBin := p.Bins[len(p.Bins)-1]
 	if maxVolumeBin.GetVolume() < maxVolumeItem.GetVolume() {
-		return InvalidBinsVolume
+		return ErrInvalidBinsVolume
 	}
 
 	itemVolumeSum := 0.0
@@ -295,7 +326,42 @@ func (p *Packer) Pack() error {
 		binVolumeSum += bin.GetVolume()
 	}
 	if binVolumeSum < itemVolumeSum {
-		return InvalidBinsVolume
+		return ErrInvalidBinsVolume
+	}
+
+	if p.FewestBoxes {
+		// Is there a bin that might hold all of the items?
+		for _, bin := range p.Bins { // NOTE: sorted from smallest to largest.
+			if bin.GetVolume() >= itemVolumeSum {
+				// Yes... let's use it.
+				p.Items = p.packToBin(bin, p.Items)
+			}
+		}
+		for len(p.Items) > 0 {
+			// No... so we want to attempt to pack with the
+			// fewest possible boxes consuming the most volume.
+			// How best to do that?
+			// Calculate needed volume.
+			need := 0.0
+			for _, item := range p.Items {
+				need += item.GetVolume()
+			}
+			// Find volume closest to this.
+			found := 0.0
+			var foundBin *Bin
+			for _, bin := range p.Bins {
+				if bin.GetAvailableVolume() >= found && bin.GetAvailableVolume() < need {
+					foundBin = bin
+					found = foundBin.GetAvailableVolume()
+				}
+			}
+			if foundBin != nil {
+				p.Items = p.packToBin(foundBin, p.Items)
+			} else {
+				// Nothing more we can do.
+				break
+			}
+		}
 	}
 
 	for len(p.Items) > 0 {
@@ -309,7 +375,7 @@ func (p *Packer) Pack() error {
 	}
 
 	if len(p.UnfitItems) > 0 {
-		return UnfitItemsExist
+		return ErrUnfitItemsExist
 	}
 
 	return nil
@@ -382,9 +448,9 @@ func (p *Packer) packToBin(b *Bin, items []*Item) (unpacked []*Item) {
 }
 
 func (p *Packer) getBiggerBinThan(b *Bin) *Bin {
-	v := b.GetVolume()
+	v := b.GetAvailableVolume()
 	for _, b2 := range p.Bins {
-		if b2.GetVolume() > v {
+		if b2.GetAvailableVolume() > v {
 			return b2
 		}
 	}

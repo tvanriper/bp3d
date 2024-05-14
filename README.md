@@ -3,11 +3,12 @@ bp3d
 
 3D Bin Packing implementation based on [this paper](http://www.cs.ukzn.ac.za/publications/erick_dube_507-034.pdf). The code is based on [binpacking by bom-d-van](https://github.com/bom-d-van/binpacking) but
 modified to allow flexible bins and use `float64` instead of `int`.
+modified to try and use as few bins as possible.
 
 ## Install
 
 ```
-go get github.com/gedex/bp3d
+go get github.com/tvanriper/bp3d
 ```
 
 ## Usage
