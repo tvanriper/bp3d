@@ -304,11 +304,19 @@ func (p *Packer) AddItem(items ...*Item) {
 var (
 	ErrInvalidBinsVolume = errors.New("invalid bins volume")
 	ErrUnfitItemsExist   = errors.New("unfit items existing")
+	ErrNoBins            = errors.New("no bins in packer")
+	ErrNoItems           = errors.New("no items in packer")
 )
 
 func (p *Packer) Pack() error {
 	sort.Sort(BinSlice(p.Bins))   // 昇順
 	sort.Sort(ItemSlice(p.Items)) // 降順
+	if len(p.Bins) == 0 {
+		return ErrNoBins
+	}
+	if len(p.Items) == 0 {
+		return ErrNoItems
+	}
 
 	maxVolumeItem := p.Items[0]
 	maxVolumeBin := p.Bins[len(p.Bins)-1]
@@ -332,7 +340,7 @@ func (p *Packer) Pack() error {
 	if p.FewestBoxes {
 		// Is there a bin that might hold all of the items?
 		for _, bin := range p.Bins { // NOTE: sorted from smallest to largest.
-			if bin.GetVolume() >= itemVolumeSum {
+			if bin.GetVolume() >= itemVolumeSum && len(p.Items) > 0 {
 				// Yes... let's use it.
 				p.Items = p.packToBin(bin, p.Items)
 			}
